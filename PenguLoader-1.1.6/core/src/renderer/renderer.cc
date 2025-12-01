@@ -5,6 +5,10 @@
 #include "include/capi/cef_app_capi.h"
 #include "include/capi/cef_render_process_handler_capi.h"
 
+#if OS_WIN
+#include <Windows.h>
+#endif
+
 // RENDERER PROCESS ONLY.
 
 static bool is_main_ = false;
@@ -236,6 +240,68 @@ static void CEF_CALLBACK Hooked_OnContextCreated(
         ExposeNativeFunctions(reinterpret_cast<V8Object *>(window));
         LoadPlugins(reinterpret_cast<V8Object *>(window));
         ExecutePreloadScript(frame);
+        
+        // Log league path status to DevTools console
+        {
+            // Check if Rose config.ini has league path
+            std::wstring rosePath;
+            wchar_t appdata[2048];
+            DWORD len = GetEnvironmentVariableW(L"LOCALAPPDATA", appdata, 2048);
+            bool pathFound = false;
+            
+            if (len > 0)
+            {
+                std::wstring cfg = std::wstring(appdata) + L"\\Rose\\config.ini";
+                wchar_t value[2048];
+                DWORD out = GetPrivateProfileStringW(
+                    L"General", L"leaguepath", L"", value, 2048, cfg.c_str());
+                if (out > 0)
+                {
+                    rosePath = std::wstring(value);
+                    // Remove trailing slash if present
+                    if (!rosePath.empty() && (rosePath.back() == L'\\' || rosePath.back() == L'/'))
+                        rosePath.pop_back();
+                    pathFound = !rosePath.empty();
+                }
+            }
+            
+            std::string logMessage;
+            if (pathFound)
+            {
+                // Convert wstring to UTF-8 string
+                std::string pathStr;
+                int size_needed = WideCharToMultiByte(CP_UTF8, 0, rosePath.c_str(), (int)rosePath.length(), NULL, 0, NULL, NULL);
+                if (size_needed > 0)
+                {
+                    pathStr.resize(size_needed);
+                    WideCharToMultiByte(CP_UTF8, 0, rosePath.c_str(), (int)rosePath.length(), &pathStr[0], size_needed, NULL, NULL);
+                }
+                
+                // Escape quotes and backslashes for JavaScript
+                std::string escapedPath;
+                for (char c : pathStr)
+                {
+                    if (c == '"')
+                        escapedPath += "\\\"";
+                    else if (c == '\\')
+                        escapedPath += "\\\\";
+                    else if (c == '\n')
+                        escapedPath += "\\n";
+                    else if (c == '\r')
+                        escapedPath += "\\r";
+                    else
+                        escapedPath += c;
+                }
+                logMessage = "console.log('%c[Pengu Loader]%c League path loaded and using from Rose config.ini: " + escapedPath + "', 'color: #4CAF50; font-weight: bold', 'color: inherit');";
+            }
+            else
+            {
+                logMessage = "console.error('%c[Pengu Loader]%c ERROR: League path not found in Rose config.ini (%LOCALAPPDATA%\\\\Rose\\\\config.ini). Path is required - please set leaguepath in [General] section.', 'color: #FF6B6B; font-weight: bold', 'color: inherit');";
+            }
+            
+            CefStr script(logMessage);
+            frame->execute_java_script(frame, &script, nullptr, 0);
+        }
     }
 
     OnContextCreated(self, browser, frame, context);
