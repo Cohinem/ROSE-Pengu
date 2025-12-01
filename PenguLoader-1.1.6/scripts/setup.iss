@@ -1,9 +1,9 @@
 
 #define MyAppName "Pengu Loader"
 #define MyAppPublisher "Pengu Loader"
-#define MyAppURL "https://pengu.lol"
+#define MyAppURL "https://github.com/Alban1911/Rose"
 #define MyAppExeName "Pengu Loader.exe"
-#define MyAppCopyright "© 2024 Pengu Loader. All rights reserved."
+#define MyAppCopyright "ï¿½ 2024 Pengu Loader. All rights reserved."
 
 #define Major
 #define Minor

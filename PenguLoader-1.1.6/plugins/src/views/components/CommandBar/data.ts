@@ -68,8 +68,8 @@ const ACTIONS: Record<string, Action[]> = {
   pengu: [
     {
       name: _t.bind(null, 'act_visit_home'),
-      legend: 'pengu.lol',
-      perform: () => window.open('https://pengu.lol', '_blank')
+      legend: 'Rose',
+      perform: () => window.open('https://github.com/Alban1911/Rose', '_blank')
     },
     {
       name: _t.bind(null, 'act_open_devtools'),
