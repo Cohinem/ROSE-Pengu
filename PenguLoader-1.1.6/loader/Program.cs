@@ -12,7 +12,7 @@ namespace PenguLoader
 {
     public static class Program
     {
-        public static string Name => "Rose";
+        public static string Name => "Rose Loader";
         public static string HomepageUrl => "https://ko-fi.com/roseapp";
         public static string DiscordUrl => "https://discord.gg/cDepnwVS8Z";
         public static string GithubRepo => "Alban1911/Rose";
