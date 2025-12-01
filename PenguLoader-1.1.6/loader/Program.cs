@@ -12,10 +12,10 @@ namespace PenguLoader
 {
     public static class Program
     {
-        public static string Name => "Pengu Loader";
-        public static string HomepageUrl => "https://pengu.lol";
-        public static string DiscordUrl => "https://chat.pengu.lol";
-        public static string GithubRepo => "PenguLoader/PenguLoader";
+        public static string Name => "Rose";
+        public static string HomepageUrl => "https://ko-fi.com/roseapp";
+        public static string DiscordUrl => "https://discord.gg/cDepnwVS8Z";
+        public static string GithubRepo => "Alban1911/Rose";
         public static string GithubUrl => $"https://github.com/{GithubRepo}";
         public static string GithubIssuesUrl => $"https://github.com/{GithubRepo}/issues";
 
