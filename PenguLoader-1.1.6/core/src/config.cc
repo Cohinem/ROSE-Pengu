@@ -2,6 +2,7 @@
 #include <fstream>
 #include <unordered_map>
 #include "include/cef_version.h"
+#include <Windows.h>
 
 #if OS_WIN
 EXTERN_C IMAGE_DOS_HEADER __ImageBase;
@@ -79,17 +80,51 @@ path config::cache_dir()
 #endif
 }
 
+static std::wstring get_rose_league_path()
+{
+    wchar_t appdata[2048];
+    DWORD len = GetEnvironmentVariableW(L"LOCALAPPDATA", appdata, 2048);
+    if (len == 0)
+        return L"";
+
+    std::wstring cfg = std::wstring(appdata) + L"\\Rose\\config.ini";
+
+    wchar_t value[2048];
+    DWORD out = GetPrivateProfileStringW(
+        L"Settings",        // INI section
+        L"leaguepath",      // key
+        L"",                // default
+        value,
+        2048,
+        cfg.c_str()
+    );
+
+    if (out == 0)
+        return L""; // not found
+
+    return std::wstring(value);
+}
+
 path config::league_dir()
 {
-#if OS_WIN
+    // 1) Try override from Rose config.ini
+    std::wstring rosePath = get_rose_league_path();
+    if (!rosePath.empty())
+    {
+        // Remove trailing slash if present
+        if (rosePath.back() == L'\\' || rosePath.back() == L'/')
+            rosePath.pop_back();
+
+        return rosePath;
+    }
+
+
+    // 2) Fallback to original PenguLoader behavior
     wchar_t buf[2048];
     size_t length = GetModuleFileNameW(nullptr, buf, _countof(buf));
 
     std::wstring path(buf, length);
     return path.substr(0, path.find_last_of(L"/\\"));
-#else
-    return "";
-#endif
 }
 
 static void trim_tring(std::string &str)
