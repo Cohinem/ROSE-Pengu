@@ -91,8 +91,8 @@ static std::wstring get_rose_league_path()
 
     wchar_t value[2048];
     DWORD out = GetPrivateProfileStringW(
-        L"Settings",        // INI section
-        L"leaguepath",      // key
+        L"General",         // INI section
+        L"clientpath",      // key
         L"",                // default
         value,
         2048,
@@ -102,7 +102,21 @@ static std::wstring get_rose_league_path()
     if (out == 0)
         return L""; // not found
 
-    return std::wstring(value);
+    std::wstring path(value);
+    // Remove trailing slash if present
+    if (!path.empty() && (path.back() == L'\\' || path.back() == L'/'))
+        path.pop_back();
+
+    // Append \LeagueClient if it doesn't already contain it
+    // This ensures we point to the directory containing LeagueClient.exe
+    std::wstring leagueClient = L"\\LeagueClient";
+    if (path.length() < leagueClient.length() || 
+        path.substr(path.length() - leagueClient.length()) != leagueClient)
+    {
+        path += leagueClient;
+    }
+
+    return path;
 }
 
 path config::league_dir()
