@@ -66,22 +66,14 @@ path config::datastore_path()
 path config::cache_dir()
 {
 #if OS_WIN
-    wchar_t appdata_path[2048];
-    size_t length = GetEnvironmentVariableW(L"LOCALAPPDATA", appdata_path, _countof(appdata_path));
+    wchar_t path[2048];
+    size_t length = GetEnvironmentVariableW(L"LOCALAPPDATA", path, _countof(path));
 
     if (length == 0)
-    {
-        path leaguePath = league_dir();
-        if (!leaguePath.empty())
-        {
-            OutputDebugStringA("[Pengu Loader] config::cache_dir() using league_dir() fallback (LOCALAPPDATA not available)\n");
-            return leaguePath / "Cache";
-        }
-        OutputDebugStringA("[Pengu Loader] ERROR: config::cache_dir() - Cannot determine cache path (no LOCALAPPDATA and no league_dir)\n");
-    }
+        return league_dir() / "Cache";
 
-    lstrcatW(appdata_path, L"\\Riot Games\\League of Legends\\Cache");
-    return appdata_path;
+    lstrcatW(path, L"\\Riot Games\\League of Legends\\Cache");
+    return path;
 #else
     // inside the RiotClient folder 
     return "/Users/Shared/Riot Games/League Client/Cache";
@@ -99,7 +91,7 @@ static std::wstring get_rose_league_path()
 
     wchar_t value[2048];
     DWORD out = GetPrivateProfileStringW(
-        L"General",         // INI section
+        L"Settings",        // INI section
         L"leaguepath",      // key
         L"",                // default
         value,
@@ -115,7 +107,7 @@ static std::wstring get_rose_league_path()
 
 path config::league_dir()
 {
-    // Get league path from Rose config.ini
+    // 1) Try override from Rose config.ini
     std::wstring rosePath = get_rose_league_path();
     if (!rosePath.empty())
     {
@@ -123,23 +115,16 @@ path config::league_dir()
         if (rosePath.back() == L'\\' || rosePath.back() == L'/')
             rosePath.pop_back();
 
-        // Log when league_dir() is called and returns the Rose path
-        // Convert to UTF-8 for console output
-        int size_needed = WideCharToMultiByte(CP_UTF8, 0, rosePath.c_str(), -1, nullptr, 0, nullptr, nullptr);
-        if (size_needed > 0)
-        {
-            std::string pathStr(size_needed, 0);
-            WideCharToMultiByte(CP_UTF8, 0, rosePath.c_str(), -1, &pathStr[0], size_needed, nullptr, nullptr);
-            pathStr.pop_back(); // Remove null terminator
-            OutputDebugStringA(("[Pengu Loader] config::league_dir() returning Rose config path: " + pathStr + "\n").c_str());
-        }
-
         return rosePath;
     }
 
-    // No fallback - return empty path if not found
-    OutputDebugStringA("[Pengu Loader] ERROR: config::league_dir() - League path not found in Rose config.ini!\n");
-    return path();
+
+    // 2) Fallback to original PenguLoader behavior
+    wchar_t buf[2048];
+    size_t length = GetModuleFileNameW(nullptr, buf, _countof(buf));
+
+    std::wstring path(buf, length);
+    return path.substr(0, path.find_last_of(L"/\\"));
 }
 
 static void trim_tring(std::string &str)

@@ -56,75 +56,9 @@ namespace PenguLoader.Main
             File.WriteAllText(ConfigPath, sb.ToString());
         }
 
-        static string GetRoseLeaguePath()
-        {
-            try
-            {
-                string appdata = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-                string configPath = Path.Combine(appdata, "Rose", "config.ini");
-                
-                if (!File.Exists(configPath))
-                {
-                    Console.WriteLine($"[Pengu Loader] ERROR: Rose config.ini not found at: {configPath}");
-                    return null;
-                }
-                
-                var lines = File.ReadAllLines(configPath);
-                bool inGeneralSection = false;
-                
-                foreach (var line in lines)
-                {
-                    var trimmed = line.Trim();
-                    
-                    // Check for section headers
-                    if (trimmed.StartsWith("[") && trimmed.EndsWith("]"))
-                    {
-                        inGeneralSection = trimmed.Equals("[General]", StringComparison.OrdinalIgnoreCase);
-                        continue;
-                    }
-                    
-                    // Check for leaguepath key in [General] section
-                    if (inGeneralSection && trimmed.StartsWith("leaguepath=", StringComparison.OrdinalIgnoreCase))
-                    {
-                        var value = trimmed.Substring("leaguepath=".Length).Trim();
-                        if (!string.IsNullOrEmpty(value))
-                        {
-                            // Remove trailing slash if present
-                            if (value.EndsWith("\\") || value.EndsWith("/"))
-                                value = value.TrimEnd('\\', '/');
-                            
-                            Console.WriteLine($"[Pengu Loader] League path loaded from Rose config.ini: {value}");
-                            return value;
-                        }
-                    }
-                }
-                
-                Console.WriteLine($"[Pengu Loader] ERROR: leaguepath key not found in [General] section of Rose config.ini");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[Pengu Loader] ERROR: Failed to read Rose config.ini: {ex.Message}");
-            }
-            
-            return null;
-        }
-
         public static string LeaguePath
         {
-            get
-            {
-                // Get from Rose config.ini only - no fallback
-                string rosePath = GetRoseLeaguePath();
-                if (string.IsNullOrEmpty(rosePath))
-                {
-                    Console.WriteLine("[Pengu Loader] ERROR: League path is required from Rose config.ini but was not found!");
-                    throw new InvalidOperationException("League path not found in Rose config.ini. Please set leaguepath in [General] section of %LOCALAPPDATA%\\Rose\\config.ini");
-                }
-                
-                // Log each time the path is accessed, showing it came from Rose config
-                Console.WriteLine($"[Pengu Loader] Config.LeaguePath accessed - using League path from Rose config.ini: {rosePath}");
-                return rosePath;
-            }
+            get => Get("LeaguePath");
             set => Set("LeaguePath", value);
         }
 
