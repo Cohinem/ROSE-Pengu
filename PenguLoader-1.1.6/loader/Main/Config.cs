@@ -58,7 +58,16 @@ namespace PenguLoader.Main
 
         public static string LeaguePath
         {
-            get => Get("LeaguePath");
+            get
+            {
+                // First, try to get from Rose config.ini
+                var rosePath = GetRoseConfigPath();
+                if (!string.IsNullOrWhiteSpace(rosePath))
+                    return rosePath;
+
+                // Fallback to local config
+                return Get("LeaguePath");
+            }
             set => Set("LeaguePath", value);
         }
 
@@ -120,6 +129,69 @@ namespace PenguLoader.Main
         static void SetBool(string key, bool value)
         {
             Set(key, value ? "true" : "false");
+        }
+
+        static string GetRoseConfigPath()
+        {
+            try
+            {
+                var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                var configPath = Path.Combine(localAppData, "Rose", "config.ini");
+                
+                if (!File.Exists(configPath))
+                    return string.Empty;
+
+                var lines = File.ReadAllLines(configPath);
+                bool inGeneralSection = false;
+
+                foreach (var line in lines)
+                {
+                    var trimmed = line.Trim();
+                    
+                    // Check for section headers
+                    if (trimmed.StartsWith("[") && trimmed.EndsWith("]"))
+                    {
+                        inGeneralSection = trimmed.Equals("[General]", StringComparison.OrdinalIgnoreCase);
+                        continue;
+                    }
+
+                    // Only process lines in [General] section
+                    if (inGeneralSection)
+                    {
+                        var parts = trimmed.Split(new[] { '=' }, 2);
+                        if (parts.Length == 2)
+                        {
+                            var key = parts[0].Trim();
+                            var value = parts[1].Trim();
+
+                            if (key.Equals("clientpath", StringComparison.OrdinalIgnoreCase))
+                            {
+                                if (string.IsNullOrWhiteSpace(value))
+                                    return string.Empty;
+
+                                // Remove trailing slash
+                                value = value.TrimEnd('\\', '/');
+
+                                // Append \LeagueClient if not already present
+                                var leagueClient = "\\LeagueClient";
+                                if (value.Length < leagueClient.Length || 
+                                    !value.EndsWith(leagueClient, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    value += leagueClient;
+                                }
+
+                                return value;
+                            }
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // Ignore errors reading config file
+            }
+
+            return string.Empty;
         }
     }
 }

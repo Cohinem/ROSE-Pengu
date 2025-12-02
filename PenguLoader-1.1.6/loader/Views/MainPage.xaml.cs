@@ -165,6 +165,15 @@ namespace PenguLoader.Views
 
         bool DoSelectLeaguePath()
         {
+            // First, try to get path from Rose config.ini
+            var rosePath = GetRoseConfigPath();
+            if (!string.IsNullOrWhiteSpace(rosePath) && LCU.IsValidDir(rosePath))
+            {
+                Config.LeaguePath = rosePath;
+                SetLeaguePath(rosePath);
+                return true;
+            }
+
             var fbd = new Ookii.Dialogs.Wpf.VistaFolderBrowserDialog();
             fbd.Description = "Select Riot Games, League of Legends or LeagueClient folder.";
             fbd.UseDescriptionForTitle = true;
@@ -191,6 +200,64 @@ namespace PenguLoader.Views
             }
 
             return false;
+        }
+
+        string GetRoseConfigPath()
+        {
+            try
+            {
+                var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                var configPath = Path.Combine(localAppData, "Rose", "config.ini");
+                
+                if (!File.Exists(configPath))
+                    return string.Empty;
+
+                var lines = File.ReadAllLines(configPath);
+                bool inGeneralSection = false;
+
+                foreach (var line in lines)
+                {
+                    var trimmed = line.Trim();
+                    
+                    if (trimmed.StartsWith("[") && trimmed.EndsWith("]"))
+                    {
+                        inGeneralSection = trimmed.Equals("[General]", StringComparison.OrdinalIgnoreCase);
+                        continue;
+                    }
+
+                    if (inGeneralSection)
+                    {
+                        var parts = trimmed.Split(new[] { '=' }, 2);
+                        if (parts.Length == 2)
+                        {
+                            var key = parts[0].Trim();
+                            var value = parts[1].Trim();
+
+                            if (key.Equals("clientpath", StringComparison.OrdinalIgnoreCase))
+                            {
+                                if (string.IsNullOrWhiteSpace(value))
+                                    return string.Empty;
+
+                                value = value.TrimEnd('\\', '/');
+
+                                var leagueClient = "\\LeagueClient";
+                                if (value.Length < leagueClient.Length || 
+                                    !value.EndsWith(leagueClient, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    value += leagueClient;
+                                }
+
+                                return value;
+                            }
+                        }
+                    }
+                }
+            }
+            catch
+            {
+            }
+
+            return string.Empty;
         }
 
         void SetLeaguePath(string path)
