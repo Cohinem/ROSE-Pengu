@@ -1,0 +1,139 @@
+name: Build PenguLoader
+
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: Build for release
+        type: boolean
+        default: false
+      release-signing:
+        description: Use release code signing
+        type: boolean
+        default: false
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: true
+
+      - name: Prepare environment variables
+        shell: pwsh
+        run: |
+          $commit_hash = "${{ github.sha }}".Substring(0, 8)
+          $app_version = (Select-String `
+            -Path "PenguLoader-1.1.6\loader\Program.cs" `
+            -Pattern 'VERSION = "(.+)"' `
+            -AllMatches).Matches.Groups[1].Value
+
+          echo "COMMIT_HASH=$commit_hash" >> $env:GITHUB_ENV
+          echo "APP_VERSION=$app_version" >> $env:GITHUB_ENV
+          echo "ARTIFACT_NAME=pengu-v$app_version-$commit_hash" >> $env:GITHUB_ENV
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+        with:
+          msbuild-architecture: x64
+
+      - name: Install .NET Framework 4.7.2 Developer Pack
+        shell: cmd
+        run: |
+          mkdir downloads
+          cd downloads
+          curl -LJO https://download.microsoft.com/download/7/1/7/71795fde-1cca-41b0-b495-00b1ab656994/NDP472-DevPack-ENU.exe
+          start /wait "" "NDP472-DevPack-ENU.exe" /q
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+          run_install: false
+
+      - name: Build preload plugins
+        shell: pwsh
+        run: |
+          cd PenguLoader-1.1.6\plugins
+          pnpm install
+          pnpm build
+
+      - name: Build solution
+        shell: pwsh
+        run: |
+          mkdir bin
+          echo "${{ env.APP_VERSION }}+${{ env.COMMIT_HASH }}" > bin\version
+
+          msbuild `
+            PenguLoader-1.1.6\pengu.sln `
+            /t:Restore,Build `
+            /m `
+            /p:Configuration=Release `
+            /p:Platform=x64
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        id: artifact-upload
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: |
+            bin/*.exe
+            bin/*.dll
+            bin/version
+
+      # ---------- RELEASE ONLY BELOW ----------
+
+      - name: Clean build output
+        if: ${{ inputs.release }}
+        shell: pwsh
+        run: |
+          Remove-Item bin\* -Recurse -Force
+
+      - name: Sign binaries
+        if: ${{ inputs.release }}
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ secrets.SIGNPATH_ORG_ID }}
+          project-slug: PenguLoader
+          signing-policy-slug: ${{ inputs.release && 'release' || 'test' }}-signing
+          artifact-configuration-slug: zipped-app
+          github-artifact-id: ${{ steps.artifact-upload.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: bin
+
+      - name: Package installer and portable zip
+        if: ${{ inputs.release }}
+        shell: pwsh
+        run: |
+          mkdir bin-signed
+          Compress-Archive bin\* bin-signed\pengu-v${{ env.APP_VERSION }}-portable.zip -Force
+
+          & "$env:ProgramFiles (x86)\Inno Setup 6\iscc.exe" `
+            /O"bin" `
+            /F"pengu-v${{ env.APP_VERSION }}-setup" `
+            PenguLoader-1.1.6\scripts\setup.iss
+
+      - name: Upload installer
+        if: ${{ inputs.release }}
+        uses: actions/upload-artifact@v4
+        id: installer-upload
+        with:
+          name: ${{ env.ARTIFACT_NAME }}-installer
+          path: bin/pengu-*-setup.exe
+
+      - name: Upload signed output
+        if: ${{ inputs.release }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}-signed
+          path: bin-signed/
